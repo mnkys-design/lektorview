@@ -7,6 +7,9 @@ const path = require('path');
 const DiffMatchPatch = require('diff-match-patch');
 
 const app = express();
+// FIX for Coolify/Reverse Proxy: Trust the X-Forwarded-* headers
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 3001;
 const DB_PATH = path.join(__dirname, 'db.json');
 // Simple Admin Secret for demonstration. In production, use process.env.ADMIN_SECRET
@@ -112,8 +115,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
               }
           }
 
-          // If a snippet was not found, we still create the change but with an empty range
-          // to avoid crashes. The frontend will simply not highlight it.
           return {
               ...change,
               id: change.id || `c${index + 1}`,
@@ -126,10 +127,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
                   end: correctedIndex + (correctedSnippet?.length || 0)
               } : { start: 0, end: 0 }
           };
-      }).filter(change => {
-          // Optional: Filter out changes where snippets were not found at all.
-          // For now, we keep them to be safe.
-          return true;
       });
 
       console.log("Successfully processed changeLog.");
