@@ -84,9 +84,11 @@ app.post('/api/generate-key', (req, res) => {
 // Create a new comparison with SERVER-SIDE index correction
 app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
   try {
+      console.log("Received new comparison request...");
       const { originalText, correctedText, changeLog = [], pdfReferences } = req.body;
 
       if (!originalText || !correctedText) {
+        console.error("Validation Error: Original and corrected text are required.");
         return res.status(400).json({ error: 'Original and corrected text are required.' });
       }
       
@@ -99,33 +101,38 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
           
           if (originalSnippet) {
               originalIndex = dmp.match_main(originalText, originalSnippet, 0);
+              if (originalIndex === -1) {
+                  console.warn(`Snippet not found in originalText: "${originalSnippet}"`);
+              }
           }
           if (correctedSnippet) {
               correctedIndex = dmp.match_main(correctedText, correctedSnippet, 0);
+               if (correctedIndex === -1) {
+                  console.warn(`Snippet not found in correctedText: "${correctedSnippet}"`);
+              }
           }
 
-          if(originalIndex === -1 && originalSnippet) {
-              console.warn(`DMP failed for originalSnippet: "${originalSnippet}". Falling back to indexOf.`);
-              originalIndex = originalText.indexOf(originalSnippet);
-          }
-          if(correctedIndex === -1 && correctedSnippet) {
-              console.warn(`DMP failed for correctedSnippet: "${correctedSnippet}". Falling back to indexOf.`);
-              correctedIndex = correctedText.indexOf(correctedSnippet);
-          }
-
+          // If a snippet was not found, we still create the change but with an empty range
+          // to avoid crashes. The frontend will simply not highlight it.
           return {
               ...change,
               id: change.id || `c${index + 1}`,
               originalRange: originalIndex !== -1 ? {
                   start: originalIndex,
-                  end: originalIndex + originalSnippet.length
+                  end: originalIndex + (originalSnippet?.length || 0)
               } : { start: 0, end: 0 },
               correctedRange: correctedIndex !== -1 ? {
                   start: correctedIndex,
-                  end: correctedIndex + correctedSnippet.length
+                  end: correctedIndex + (correctedSnippet?.length || 0)
               } : { start: 0, end: 0 }
           };
+      }).filter(change => {
+          // Optional: Filter out changes where snippets were not found at all.
+          // For now, we keep them to be safe.
+          return true;
       });
+
+      console.log("Successfully processed changeLog.");
 
       const db = readDB();
       const slug = crypto.randomBytes(8).toString('hex');
@@ -145,12 +152,12 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
       db.comparisons[slug] = newComparison;
       writeDB(db);
 
-      // FIX for GPT Actions: Hardcode HTTPS and domain, return status 200
       const shareUrl = `https://lektorview.chrustek.studio/view/${slug}`;
+      console.log(`Successfully created comparison. Slug: ${slug}`);
       res.status(200).json({ slug, shareUrl });
 
   } catch (error) {
-      console.error("Error creating comparison:", error);
+      console.error("FATAL Error creating comparison:", error);
       res.status(500).json({ error: "Internal Server Error" });
   }
 });
