@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Download, Share2, Info, FileText, CheckCircle2, Key, Loader2, Upload, File } from "lucide-react";
+import { Download, Share2, Info, FileText, CheckCircle2, Key, Loader2, Lock } from "lucide-react";
 import { api } from "./services/api";
 import { ChangeList } from "./components/ChangeList";
 import { TextRenderer } from "./components/TextRenderer";
@@ -13,10 +13,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   // New Upload/API Key State
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKey, setApiKey] = useState<string>("");
   const [generatedApiKey, setGeneratedApiKey] = useState<string>("");
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [adminSecret, setAdminSecret] = useState<string>("");
   
   // Reference Modal State
   const [refModalOpen, setRefModalOpen] = useState(false);
@@ -85,11 +83,11 @@ export default function App() {
 
   const handleGenerateApiKey = async () => {
       try {
-          const key = await api.generateApiKey();
+          const key = await api.generateApiKey(adminSecret);
           setGeneratedApiKey(key);
-      } catch (err) {
+      } catch (err: any) {
           console.error(err);
-          alert("Failed to generate API Key");
+          alert(err.message || "Failed to generate API Key");
       }
   }
 
@@ -106,18 +104,31 @@ export default function App() {
                           <p className="text-xs text-blue-600 mb-4">
                               Use this key to upload comparisons securely via our API.
                           </p>
+                          
                           {generatedApiKey ? (
                               <div className="bg-white p-2 rounded border border-gray-200 break-all font-mono text-sm">
                                   {generatedApiKey}
                               </div>
                           ) : (
-                              <button
-                                  onClick={handleGenerateApiKey}
-                                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
-                              >
-                                  <Key size={16} />
-                                  Generate New Key
-                              </button>
+                              <div className="space-y-3">
+                                  <div className="relative">
+                                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input 
+                                        type="password" 
+                                        placeholder="Admin Secret" 
+                                        value={adminSecret}
+                                        onChange={(e) => setAdminSecret(e.target.value)}
+                                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                    />
+                                  </div>
+                                  <button
+                                      onClick={handleGenerateApiKey}
+                                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                                  >
+                                      <Key size={16} />
+                                      Generate New Key
+                                  </button>
+                              </div>
                           )}
                       </div>
 

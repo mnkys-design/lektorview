@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: lektorview-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node index.js
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: ADMIN_SECRET
+        generateValue: true
