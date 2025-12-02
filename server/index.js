@@ -4,6 +4,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const DiffMatchPatch = require('diff-match-patch');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -80,14 +81,54 @@ app.post('/api/generate-key', (req, res) => {
     }
 });
 
-// Upload and Create a new comparison
+// Create a new comparison with SERVER-SIDE index correction
 app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
   try {
-      const { originalText, correctedText, changeLog, pdfReferences } = req.body;
+      const { originalText, correctedText, changeLog = [], pdfReferences } = req.body;
 
       if (!originalText || !correctedText) {
         return res.status(400).json({ error: 'Original and corrected text are required.' });
       }
+      
+      const dmp = new DiffMatchPatch();
+
+      const correctedChangeLog = changeLog.map((change, index) => {
+          const { originalSnippet, correctedSnippet } = change;
+          let originalIndex = -1;
+          let correctedIndex = -1;
+          
+          // Find the best match for the snippet in the respective texts
+          // This is more robust than indexOf, especially for repeated words.
+          if (originalSnippet) {
+              originalIndex = dmp.match_main(originalText, originalSnippet, 0);
+          }
+          if (correctedSnippet) {
+              correctedIndex = dmp.match_main(correctedText, correctedSnippet, 0);
+          }
+
+          // Fallback to simple indexOf if dmp fails, but log a warning.
+          if(originalIndex === -1 && originalSnippet) {
+              console.warn(`DMP failed for originalSnippet: "${originalSnippet}". Falling back to indexOf.`);
+              originalIndex = originalText.indexOf(originalSnippet);
+          }
+          if(correctedIndex === -1 && correctedSnippet) {
+              console.warn(`DMP failed for correctedSnippet: "${correctedSnippet}". Falling back to indexOf.`);
+              correctedIndex = correctedText.indexOf(correctedSnippet);
+          }
+
+          return {
+              ...change,
+              id: change.id || `c${index + 1}`, // Ensure ID exists
+              originalRange: originalIndex !== -1 ? {
+                  start: originalIndex,
+                  end: originalIndex + originalSnippet.length
+              } : { start: 0, end: 0 },
+              correctedRange: correctedIndex !== -1 ? {
+                  start: correctedIndex,
+                  end: correctedIndex + correctedSnippet.length
+              } : { start: 0, end: 0 }
+          };
+      });
 
       const db = readDB();
       const slug = crypto.randomBytes(8).toString('hex');
@@ -95,7 +136,7 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
         slug,
         originalText,
         correctedText,
-        changeLog: changeLog || [],
+        changeLog: correctedChangeLog,
         pdfReferences: pdfReferences || {},
         createdAt: new Date().toISOString(),
       };
@@ -107,8 +148,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
       db.comparisons[slug] = newComparison;
       writeDB(db);
 
-      // Construct URL based on where the request came from, or environment
-      // In production (Coolify), this will be the domain of the app.
       const shareUrl = `${req.protocol}://${req.get('host')}/view/${slug}`;
       res.status(201).json({ slug, shareUrl });
   } catch (error) {
@@ -136,19 +175,11 @@ app.get('/api/public/comparisons/:slug', (req, res) => {
 });
 
 // --- SERVE FRONTEND (STATIC FILES) ---
-// Serve static files from the React app build directory
-// Located two levels up in standard docker structure: /app/dist
-// Or locally: ../dist
 const distPath = path.join(__dirname, '../dist');
-
 if (fs.existsSync(distPath)) {
     console.log(`Serving static files from ${distPath}`);
     app.use(express.static(distPath));
-
-    // Handle React routing, return all requests to React app
-    // Fixed for Express 5: Use regex /.*/ instead of '*' string
     app.get(/.*/, (req, res) => {
-        // Don't interfere with API routes (express handles order, so API routes match first)
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
