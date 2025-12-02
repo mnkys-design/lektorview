@@ -4,7 +4,6 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const DiffMatchPatch = require('diff-match-patch');
 
 const app = express();
 // FIX for Coolify/Reverse Proxy: Trust the X-Forwarded-* headers
@@ -62,21 +61,13 @@ app.post('/api/generate-key', (req, res) => {
         const { adminSecret } = req.body;
         
         if (adminSecret !== ADMIN_SECRET) {
-             console.log('Unauthorized attempt to generate key');
              return res.status(403).json({ error: "Invalid Admin Secret" });
         }
-
-        console.log('Generating API Key...');
         const db = readDB();
         const newApiKey = crypto.randomBytes(16).toString('hex');
-        
-        if (!db.apiKeys) {
-            db.apiKeys = [];
-        }
-        
+        if (!db.apiKeys) { db.apiKeys = []; }
         db.apiKeys.push(newApiKey);
         writeDB(db);
-        console.log('API Key Generated:', newApiKey);
         res.json({ apiKey: newApiKey });
     } catch (error) {
         console.error("Error generating API key:", error);
@@ -84,35 +75,28 @@ app.post('/api/generate-key', (req, res) => {
     }
 });
 
-// Create a new comparison with SERVER-SIDE index correction
+// Create a new comparison with robust index correction
 app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
   try {
       console.log("Received new comparison request...");
-      const { originalText, correctedText, changeLog = [], pdfReferences } = req.body;
+      const { originalText, correctedText, changeLog = [] } = req.body;
 
       if (!originalText || !correctedText) {
-        console.error("Validation Error: Original and corrected text are required.");
         return res.status(400).json({ error: 'Original and corrected text are required.' });
       }
       
-      const dmp = new DiffMatchPatch();
-
       const correctedChangeLog = changeLog.map((change, index) => {
           const { originalSnippet, correctedSnippet } = change;
-          let originalIndex = -1;
-          let correctedIndex = -1;
           
-          if (originalSnippet) {
-              originalIndex = dmp.match_main(originalText, originalSnippet, 0);
-              if (originalIndex === -1) {
-                  console.warn(`Snippet not found in originalText: "${originalSnippet}"`);
-              }
+          // Use simple, fast, and reliable indexOf search.
+          const originalIndex = originalSnippet ? originalText.indexOf(originalSnippet) : -1;
+          const correctedIndex = correctedSnippet ? correctedText.indexOf(correctedSnippet) : -1;
+
+          if (originalIndex === -1 && originalSnippet) {
+              console.warn(`Snippet not found in originalText: "${originalSnippet}"`);
           }
-          if (correctedSnippet) {
-              correctedIndex = dmp.match_main(correctedText, correctedSnippet, 0);
-               if (correctedIndex === -1) {
-                  console.warn(`Snippet not found in correctedText: "${correctedSnippet}"`);
-              }
+          if (correctedIndex === -1 && correctedSnippet) {
+              console.warn(`Snippet not found in correctedText: "${correctedSnippet}"`);
           }
 
           return {
@@ -120,11 +104,11 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
               id: change.id || `c${index + 1}`,
               originalRange: originalIndex !== -1 ? {
                   start: originalIndex,
-                  end: originalIndex + (originalSnippet?.length || 0)
+                  end: originalIndex + originalSnippet.length
               } : { start: 0, end: 0 },
               correctedRange: correctedIndex !== -1 ? {
                   start: correctedIndex,
-                  end: correctedIndex + (correctedSnippet?.length || 0)
+                  end: correctedIndex + correctedSnippet.length
               } : { start: 0, end: 0 }
           };
       });
@@ -138,14 +122,10 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
         originalText,
         correctedText,
         changeLog: correctedChangeLog,
-        pdfReferences: pdfReferences || {},
         createdAt: new Date().toISOString(),
       };
       
-      if (!db.comparisons) {
-          db.comparisons = {};
-      }
-
+      if (!db.comparisons) { db.comparisons = {}; }
       db.comparisons[slug] = newComparison;
       writeDB(db);
 
@@ -192,5 +172,4 @@ if (fs.existsSync(distPath)) {
 // --- Server ---
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
-  console.log(`Admin Secret is set to: ${ADMIN_SECRET}`);
 });

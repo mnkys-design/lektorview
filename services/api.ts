@@ -3,7 +3,7 @@ import { Comparison } from "../types";
 import { jsPDF } from "jspdf";
 
 // Use relative URL so the proxy in vite.config.ts can handle it
-const API_BASE_URL = '';
+const API_BASE_URL = 'https://lektorview.chrustek.studio';
 
 /**
  * API Service for LektorView
