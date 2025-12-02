@@ -97,8 +97,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
           let originalIndex = -1;
           let correctedIndex = -1;
           
-          // Find the best match for the snippet in the respective texts
-          // This is more robust than indexOf, especially for repeated words.
           if (originalSnippet) {
               originalIndex = dmp.match_main(originalText, originalSnippet, 0);
           }
@@ -106,7 +104,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
               correctedIndex = dmp.match_main(correctedText, correctedSnippet, 0);
           }
 
-          // Fallback to simple indexOf if dmp fails, but log a warning.
           if(originalIndex === -1 && originalSnippet) {
               console.warn(`DMP failed for originalSnippet: "${originalSnippet}". Falling back to indexOf.`);
               originalIndex = originalText.indexOf(originalSnippet);
@@ -118,7 +115,7 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
 
           return {
               ...change,
-              id: change.id || `c${index + 1}`, // Ensure ID exists
+              id: change.id || `c${index + 1}`,
               originalRange: originalIndex !== -1 ? {
                   start: originalIndex,
                   end: originalIndex + originalSnippet.length
@@ -148,8 +145,10 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
       db.comparisons[slug] = newComparison;
       writeDB(db);
 
-      const shareUrl = `${req.protocol}://${req.get('host')}/view/${slug}`;
-      res.status(201).json({ slug, shareUrl });
+      // FIX for GPT Actions: Hardcode HTTPS and domain, return status 200
+      const shareUrl = `https://lektorview.chrustek.studio/view/${slug}`;
+      res.status(200).json({ slug, shareUrl });
+
   } catch (error) {
       console.error("Error creating comparison:", error);
       res.status(500).json({ error: "Internal Server Error" });
