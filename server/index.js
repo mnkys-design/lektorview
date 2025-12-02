@@ -108,7 +108,7 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
       writeDB(db);
 
       // Construct URL based on where the request came from, or environment
-      // For development, we use the request host.
+      // In production (Coolify), this will be the domain of the app.
       const shareUrl = `${req.protocol}://${req.get('host')}/view/${slug}`;
       res.status(201).json({ slug, shareUrl });
   } catch (error) {
@@ -134,6 +134,25 @@ app.get('/api/public/comparisons/:slug', (req, res) => {
       res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+// --- SERVE FRONTEND (STATIC FILES) ---
+// Serve static files from the React app build directory
+// Located two levels up in standard docker structure: /app/dist
+// Or locally: ../dist
+const distPath = path.join(__dirname, '../dist');
+
+if (fs.existsSync(distPath)) {
+    console.log(`Serving static files from ${distPath}`);
+    app.use(express.static(distPath));
+
+    // Handle React routing, return all requests to React app
+    app.get('*', (req, res) => {
+        // Don't interfere with API routes (though they are defined above, so express handles order)
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    console.log("No dist folder found. API only mode.");
+}
 
 // --- Server ---
 app.listen(PORT, '0.0.0.0', () => {
