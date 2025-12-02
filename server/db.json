@@ -1,4 +1,15 @@
 {
-  "comparisons": {},
-  "apiKeys": []
+  "comparisons": {
+    "b2885a653c29a263": {
+      "slug": "b2885a653c29a263",
+      "originalText": "Here is some text with a typo.",
+      "correctedText": "Here is some text with a typo corrected.",
+      "changeLog": [],
+      "pdfReferences": {},
+      "createdAt": "2025-12-02T11:36:50.788Z"
+    }
+  },
+  "apiKeys": [
+    "78b9660d04acddb0a2f1ad99c5ab1361"
+  ]
 }

@@ -2,7 +2,8 @@
 import { Comparison } from "../types";
 import { jsPDF } from "jspdf";
 
-const API_BASE_URL = 'http://localhost:3001';
+// Use relative URL so the proxy in vite.config.ts can handle it
+const API_BASE_URL = '';
 
 /**
  * API Service for LektorView
@@ -17,12 +18,20 @@ class ApiClient {
   /**
    * Generates a new API key from the server.
    */
-  async generateApiKey(): Promise<string> {
+  async generateApiKey(adminSecret: string): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/api/generate-key`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ adminSecret })
     });
+    
     if (!response.ok) {
-      throw new Error('Failed to generate API key');
+        if (response.status === 403) {
+            throw new Error('Invalid Admin Secret');
+        }
+        throw new Error('Failed to generate API key');
     }
     const data = await response.json();
     return data.apiKey;
@@ -64,12 +73,25 @@ class ApiClient {
   async getComparison(slug: string): Promise<Comparison> {
     const response = await fetch(`${API_BASE_URL}/api/public/comparisons/${slug}`);
     if (!response.ok) {
-      // For this public endpoint, we can simulate a not found error
-      // similar to the mock, but based on a real 404.
       await new Promise((resolve) => setTimeout(resolve, 600));
       return Promise.reject('Comparison not found');
     }
-    return response.json();
+    
+    const data = await response.json();
+    
+    // Transform backend data to match Comparison interface
+    return {
+        id: data.slug,
+        slug: data.slug,
+        title: "Comparison Report", // Default title
+        originalText: data.originalText,
+        correctedText: data.correctedText,
+        // Map changeLog to changes, ensure it's an array
+        changes: Array.isArray(data.changeLog) ? data.changeLog : [],
+        // Map pdfReferences to referenceSources if possible, or default to empty array
+        referenceSources: Array.isArray(data.pdfReferences) ? data.pdfReferences : [], 
+        createdAt: data.createdAt
+    } as Comparison;
   }
 
   /**
