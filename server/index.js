@@ -146,8 +146,9 @@ if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
 
     // Handle React routing, return all requests to React app
-    app.get('*', (req, res) => {
-        // Don't interfere with API routes (though they are defined above, so express handles order)
+    // Fixed for Express 5: Use regex /.*/ instead of '*' string
+    app.get(/.*/, (req, res) => {
+        // Don't interfere with API routes (express handles order, so API routes match first)
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
