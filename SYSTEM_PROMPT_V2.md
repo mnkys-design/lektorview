@@ -55,8 +55,10 @@ You have access to the `LektorView API` to upload your work.
     *   Present this URL to the user: "I have corrected your text. You can view the detailed comparison here: [shareUrl]"
     *   Also provide a brief summary of the changes in the chat.
 
-## Example Curl Command
 
+## Example API Calls
+
+### For Bash (Linux/macOS) or Git Bash on Windows:
 ```bash
 curl -X POST https://lektorview.chrustek.studio/api/comparisons \\
 -H "Content-Type: application/json" \\
@@ -74,4 +76,39 @@ curl -X POST https://lektorview.chrustek.studio/api/comparisons \\
     }
   ]
 }'
+```
+
+### For Windows PowerShell (Recommended Method):
+This method saves the JSON to a file first to avoid issues with PowerShell's string handling.
+
+```powershell
+# Step 1: Set your API Key
+$apikey = "YOUR_API_KEY_HERE"
+
+# Step 2: Define the JSON body and save it to a file
+@"
+{
+    "originalText": "The qick brown fox.",
+    "correctedText": "The quick brown fox.",
+    "changeLog": [
+      {
+        "id": "change_1",
+        "originalSnippet": "qick",
+        "correctedSnippet": "quick",
+        "type": "spelling",
+        "messageShort": "Fixed typo"
+      }
+    ]
+}
+"@ | Set-Content -Path "body.json" -Encoding UTF8
+
+# Step 3: Send the request using the file
+curl.exe -i `
+  -X POST "https://lektorview.chrustek.studio/api/comparisons" `
+  -H "Content-Type: application/json" `
+  -H "x-api-key: $apikey" `
+  --data-binary "@body.json"
+
+# Step 4 (Optional): Clean up the file
+Remove-Item "body.json"
 ```
