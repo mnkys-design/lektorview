@@ -1,35 +1,79 @@
+
 import { Comparison } from "../types";
-import { MOCK_COMPARISON } from "./mockData";
 import { jsPDF } from "jspdf";
 
+const API_BASE_URL = 'http://localhost:3001';
+
 /**
- * API Service
- * 
- * Follows the RESTful design patterns described in the product specification.
- * 
- * Endpoints simulated:
- * - GET /api/public/comparisons/{slug}
- * - GET /api/comparisons/{slug}/download
+ * API Service for LektorView
  */
 class ApiClient {
+  private apiKey: string | null = null;
+
+  setApiKey(key: string) {
+    this.apiKey = key;
+  }
+
+  /**
+   * Generates a new API key from the server.
+   */
+  async generateApiKey(): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/api/generate-key`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to generate API key');
+    }
+    const data = await response.json();
+    return data.apiKey;
+  }
+
+  /**
+   * Creates a new comparison on the server.
+   */
+  async createComparison(data: {
+    originalText: string;
+    correctedText: string;
+    changeLog?: any[];
+    pdfReferences?: any;
+  }): Promise<{ slug: string; shareUrl: string }> {
+    if (!this.apiKey) {
+      throw new Error("API Key not set. Please set it before making this request.");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/comparisons`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create comparison');
+    }
+
+    return response.json();
+  }
+
   /**
    * Fetches the comparison data for a given slug.
-   * Maps to GET /api/public/comparisons/{slug}
    */
   async getComparison(slug: string): Promise<Comparison> {
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    
-    // In a real implementation:
-    // const response = await fetch(`/api/public/comparisons/${slug}`);
-    // return response.json();
-    
-    return MOCK_COMPARISON;
+    const response = await fetch(`${API_BASE_URL}/api/public/comparisons/${slug}`);
+    if (!response.ok) {
+      // For this public endpoint, we can simulate a not found error
+      // similar to the mock, but based on a real 404.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return Promise.reject('Comparison not found');
+    }
+    return response.json();
   }
 
   /**
    * Downloads the corrected text in the specified format.
-   * Maps to GET /api/comparisons/{slug}/download?format={format}
    */
   async downloadCorrectedText(comparison: Comparison, format: 'pdf' | 'txt' | 'docx') {
     if (format === 'pdf') {
@@ -38,47 +82,34 @@ class ApiClient {
       this.downloadTxt(comparison);
     } else {
       console.warn("Format not implemented strictly in client-side demo:", format);
-      // Fallback to text for docx in this demo context
       this.downloadTxt(comparison);
     }
   }
 
   private async generatePdf(comparison: Comparison) {
     const doc = new jsPDF();
-    
-    // Header
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.text("LektorView Correction Report", 20, 20);
-    
-    // Metadata
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Document: ${comparison.title || "Untitled"}`, 20, 30);
-    doc.text(`Date: ${new Date(comparison.createdAt).toLocaleDateString()}`, 20, 35);
+    doc.text(`Date: ${new Date(comparison.createdAt).toLocaleDateString()}`,
+      20,
+      35
+    );
     doc.text(`ID: ${comparison.slug}`, 20, 40);
-
-    // Separator
     doc.setDrawColor(200);
     doc.line(20, 45, 190, 45);
-
-    // Content
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
     doc.setTextColor(0);
-    
     const margin = 20;
     const maxWidth = 170;
     const startY = 55;
-    
-    // Handle basic text wrapping
-    // Note: Standard jsPDF fonts supports Latin-1 (including German umlauts)
     const splitText = doc.splitTextToSize(comparison.correctedText, maxWidth);
-    
     doc.text(splitText, margin, startY);
-    
-    // Footer
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -86,7 +117,6 @@ class ApiClient {
       doc.setTextColor(150);
       doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
     }
-
     doc.save(`lektorview_${comparison.slug}.pdf`);
   }
 
