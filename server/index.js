@@ -18,15 +18,20 @@ if (!fs.existsSync(DB_PATH)) {
     fs.writeFileSync(DB_PATH, JSON.stringify({ comparisons: {}, apiKeys: [] }, null, 2), 'utf8');
 }
 
-// Middleware
-app.use(cors());
-
-// --- DEBUGGING MIDDLEWARE ---
-// Logs every request method and URL
+// --- DEBUGGING MIDDLEWARE (First to log EVERYTHING including CORS preflights) ---
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
+
+// Middleware
+// Explicit CORS configuration to allow LangDock and x-api-key
+app.use(cors({
+    origin: '*', // Allow any domain (LangDock, localhost, etc.)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-Requested-With'],
+    credentials: false // Set to true if you need cookies, but requires specific origin instead of *
+}));
 
 // IMPORTANT: Use a raw body parser to log the incoming request for debugging
 app.use(express.json({ 
@@ -44,7 +49,9 @@ const writeDB = (data) => fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2
 
 // API Key Middleware
 const apiKeyMiddleware = (req, res, next) => {
+  // Check for key in headers (case-insensitive usually, but node headers are lowercase)
   const apiKey = req.headers['x-api-key'];
+  
   console.log(`[AUTH CHECK] Checking API Key: ${apiKey ? (apiKey.substring(0,4) + '***') : 'NONE'}`); // Log masked key
   
   const db = readDB();
