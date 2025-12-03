@@ -1,86 +1,120 @@
-📝 LektorView
-Professional Text Comparison & Visualization for AI Agents
+# 📝 LektorView
 
-LektorView ist ein spezialisiertes Tool zur Visualisierung von Textkorrekturen. Es ermöglicht KI-Assistenten (wie Custom GPTs, Langdock Agents oder Claude), Korrekturen nicht nur als Textwüste auszugeben, sondern als interaktiven, visuellen Vorher-Nachher-Vergleich bereitzustellen.
+**Professional Text Comparison & Visualization for AI Agents**
 
-Perfekt für Lektorats-Tasks, Code-Reviews oder Übersetzungsabgleiche.
+LektorView ist ein spezialisiertes Tool zur Visualisierung von Textkorrekturen. Es ermöglicht KI-Assistenten (wie Custom GPTs, Langdock Agents oder Claude), Korrekturen als interaktiven, visuellen Vorher-Nachher-Vergleich, statt als bloße Textausgabe, bereitzustellen.
 
-✨ Features
-Visueller Diff-View: Farbliche Hervorhebung von Änderungen (Einfügungen, Löschungen, Verschiebungen).
+Ideal für Lektoratsaufgaben, Code-Reviews oder Übersetzungsabgleiche.
 
-Interaktive Change-Liste: Klickbare Änderungen, die direkt zur Textstelle scrollen.
+---
 
-Kategorisierte Fehler: Unterscheidung nach Typ (Rechtschreibung, Grammatik, Stil, Glossar, etc.).
+## ✨ Features
 
-API-First Design: Gebaut für die nahtlose Integration in KI-Workflows (OpenAPI kompatibel).
+- **Visueller Diff-View**  
+  Farbliche Hervorhebung von Änderungen (Einfügungen, Löschungen, Verschiebungen).
+- **Interaktive Change-Liste**  
+  Jede Änderung ist klickbar und scrollt direkt zur Textstelle.
+- **Kategorisierte Fehler**  
+  Unterscheidung nach Typ: Rechtschreibung, Grammatik, Stil, Glossar, etc.
+- **API-First Design**  
+  Entwickelt für nahtlose Integration in KI-Workflows (OpenAPI kompatibel).
+- **PDF Export**  
+  Erzeugt professionelle Korrekturberichte direkt im Browser.
+- **Shareable Links**  
+  Permanente Links zu Vergleichen (`/view/:slug`).
+- **Dual Auth System**  
+  Unterstützt Admin-Secrets (Bearer) und generierte API-Keys.
 
-PDF Export: Generierung von professionellen Korrekturberichten direkt im Browser.
+---
 
-Shareable Links: Permanente Links zu Vergleichen (/view/:slug).
+## 🛠 Tech Stack
 
-Dual Auth System: Unterstützt sowohl Admin-Secrets (Bearer) als auch generierte API-Keys.
+**Frontend:**  
+React 19, Vite, Tailwind CSS, Lucide React
 
-🛠 Tech Stack
-Frontend: React 19, Vite, Tailwind CSS, Lucide React
+**Backend:**  
+Node.js, Express
 
-Backend: Node.js, Express
+**Datenbank:**  
+JSON-basierte Flatfile DB (leicht & portabel)
 
-Datenbank: JSON-basierte Flatfile DB (Lightweight & Portable)
+**Deployment:**  
+Docker-ready (Coolify / Render kompatibel)
 
-Deployment: Docker-ready (Coolify / Render kompatibel)
+---
 
-🚀 Getting Started
-Voraussetzungen
-Node.js (v18 oder höher)
+## 🚀 Getting Started
 
-npm
+### Voraussetzungen
 
-Installation & Start
-LektorView ist ein Monorepo-Setup (Frontend & Backend in einem).
+- Node.js (v18 oder höher)
+- npm
 
-Repository klonen & installieren:
+### Installation & Start
 
-Bash
+LektorView nutzt ein Monorepo-Setup (Frontend & Backend in einem).
 
+```bash
 git clone https://github.com/dein-user/lektorview.git
 cd lektorview
 npm install
-Backend starten (Port 3001): In einem Terminal:
+```
 
-Bash
+**Backend starten (Port 3001):**
 
+```bash
 npm run server
-Frontend starten (Port 3000): In einem zweiten Terminal:
+```
 
-Bash
+**Frontend starten (Port 3000):**
 
+```bash
 npm run dev
-Die App ist nun unter http://localhost:3000 erreichbar. Das Backend läuft auf http://localhost:3001.
+```
 
-🔌 API Dokumentation
-Die API ist das Herzstück für deine KI-Agenten. Sie akzeptiert Texte und Änderungsprotokolle und gibt eine URL zur Visualisierung zurück.
+> Die Applikation ist unter [http://localhost:3000](http://localhost:3000) erreichbar.  
+> Das Backend läuft auf [http://localhost:3001](http://localhost:3001).
 
-Authentifizierung
-Es gibt zwei Wege, sich zu authentifizieren:
+---
 
-Bearer Token (Admin Secret) - Empfohlen für Backend-to-Backend / GPTs Setze den Header Authorization: Bearer <DEIN_ADMIN_SECRET>. Das Secret wird in der Umgebungsvariable ADMIN_SECRET (oder API_BEARER_TOKEN) definiert.
+## 🔌 API Dokumentation
 
-API Key (x-api-key) - Für Clients / Langdock Setze den Header x-api-key: <GENERIERTER_KEY>. Keys können über den /api/auth Endpunkt generiert werden.
+Die API bildet das Herzstück für deine KI-Agenten und gibt eine Visualisierungs-URL zurück.
 
-Endpoints
-1. Neuen Vergleich erstellen
-POST /api/comparisons
+### Authentifizierung
 
-Headers:
+Es gibt zwei Wege:
 
+**1. Bearer Token (Admin Secret)**  
+Empfohlen für Backend-zu-Backend / GPTs  
+Setze den Header:  
+`Authorization: Bearer <DEIN_ADMIN_SECRET>`  
+Das Secret wird in der Umgebungsvariable `ADMIN_SECRET` (oder `API_BEARER_TOKEN`) definiert.
+
+**2. API Key (`x-api-key`)**  
+Für Clients/Langdock  
+Setze den Header:  
+`x-api-key: <GENERIERTER_KEY>`  
+Keys lassen sich via `/api/auth` generieren.
+
+---
+
+### Endpoints
+
+#### 1. Neuen Vergleich erstellen
+
+**POST** `/api/comparisons`
+
+**Headers:**
+
+```http
 Content-Type: application/json
-
 Authorization: Bearer SuperSecretPassword123
+```
 
-Body:
+**Body:**
 
-JSON
-
+```json
 {
   "originalText": "Dies ist ein Test mit fehlern.",
   "correctedText": "Dies ist ein Test ohne Fehler.",
@@ -93,37 +127,42 @@ JSON
     }
   ]
 }
-Response:
+```
 
-JSON
+**Response:**
 
+```json
 {
   "slug": "8f3a2...",
   "shareUrl": "https://lektorview.deine-domain.de/view/8f3a2..."
 }
-🤖 Integration in KI-Agenten (Langdock / GPTs)
-LektorView ist optimiert für die Nutzung durch LLMs.
+```
 
-System Prompt Schnipsel
-Gib deinem Agenten folgende Instruktion, um das Tool korrekt zu nutzen:
+---
 
-"Wenn du Texte korrigierst, erstelle IMMER ein JSON-Array für das changeLog. Rufe danach die Action uploadComparison auf. Antworte dem Nutzer erst, wenn du die shareUrl erhalten hast, und gib diese als klickbaren Link aus."
+## 🤖 Integration in KI-Agenten (Langdock / GPTs)
 
-Langdock Setup (Quick)
-Neue Custom Integration erstellen.
+LektorView kann mit LLMs und Agents genutzt werden.
 
-Auth Type: API Key -> Header: Authorization -> Value Prefix: Bearer .
+**System Prompt Schnipsel**
 
-Als Key dein ADMIN_SECRET eintragen.
+Gib deinem Agenten diese Instruktion zum optimalen Workflow:
 
-Action Code: Siehe interne Dokumentation oder nutze ld.request mit dem POST Body.
+> "Wenn du Texte korrigierst, erstelle IMMER ein JSON-Array für das changeLog. Rufe danach die Action `uploadComparison` auf. Antworte dem Nutzer erst, wenn du die `shareUrl` erhalten hast, und gib diese als klickbaren Link aus."
 
-📦 Deployment
-Docker / Coolify
-Ein Dockerfile ist enthalten. Setze folgende Environment Variables in deiner Hosting-Plattform:
+**Langdock Setup (Quick)**
 
-ADMIN_SECRET: Dein sicheres Passwort für den Admin-Zugriff.
+- Neue Custom Integration erstellen.
+- Auth Type: API Key -> Header: Authorization -> Value Prefix: Bearer .
+- Als Key dein ADMIN_SECRET eintragen.
+- Action Code: Siehe interne Doku oder nutze `ld.request` mit dem POST-Body.
 
-PORT: 3001 (Interner Server Port).
+---
 
-Siehe DEPLOY_BACKEND.md für Details zum Deployment auf Render.com.
+## 📦 Deployment
+
+**Docker/Coolify:**  
+Ein Dockerfile ist enthalten. Setze folgende Environment Variables auf deiner Hosting-Plattform:
+
+- `ADMIN_SECRET`: Sicheres Passwort für Admin-Zugriff
+- `PORT`: 3001 (interner Server-Port)
