@@ -20,6 +20,14 @@ if (!fs.existsSync(DB_PATH)) {
 
 // Middleware
 app.use(cors());
+
+// --- DEBUGGING MIDDLEWARE ---
+// Logs every request method and URL
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // IMPORTANT: Use a raw body parser to log the incoming request for debugging
 app.use(express.json({ 
     limit: '50mb',
@@ -37,8 +45,11 @@ const writeDB = (data) => fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2
 // API Key Middleware
 const apiKeyMiddleware = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
+  console.log(`[AUTH CHECK] Checking API Key: ${apiKey ? (apiKey.substring(0,4) + '***') : 'NONE'}`); // Log masked key
+  
   const db = readDB();
   if (!apiKey || !db.apiKeys.includes(apiKey)) {
+    console.warn(`[AUTH FAIL] Invalid or missing API Key. Received: ${apiKey}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing API Key' });
   }
   next();
@@ -57,6 +68,7 @@ app.post('/api/auth', (req, res) => {
     
     // Check against the Environment Variable
     if (adminSecret !== ADMIN_SECRET) {
+        console.warn(`[AUTH FAIL] /api/auth called with invalid secret.`);
         return res.status(401).json({ error: "Invalid Admin Secret" });
     }
 
@@ -67,7 +79,7 @@ app.post('/api/auth', (req, res) => {
     db.apiKeys.push(newApiKey);
     writeDB(db);
 
-    console.log(`New API Key generated via Agent Auth: ${newApiKey}`);
+    console.log(`[AUTH SUCCESS] New API Key generated: ${newApiKey}`);
     res.json({ apiKey: newApiKey });
 });
 
@@ -87,11 +99,16 @@ app.post('/api/generate-key', (req, res) => {
 
 app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
     // Log the raw request body from GPT for debugging
-    console.log("Raw request body received:", req.rawBody.toString('utf8'));
+    if (req.rawBody) {
+        console.log("[DEBUG] Raw Body Length:", req.rawBody.length);
+        // Uncomment next line to see full body in logs (can be huge)
+        // console.log("[DEBUG] Raw Body Content:", req.rawBody.toString('utf8').substring(0, 500) + "..."); 
+    }
 
     const { originalText, correctedText, changeLog = [] } = req.body;
 
     if (!originalText || !correctedText) {
+      console.error("[ERROR] Missing originalText or correctedText");
       return res.status(400).json({ error: 'Original and corrected text are required.' });
     }
     
@@ -101,10 +118,10 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
         const correctedIndex = correctedSnippet ? correctedText.indexOf(correctedSnippet) : -1;
 
         if (originalIndex === -1 && originalSnippet) {
-            console.warn(`Snippet not found in originalText: "${originalSnippet}"`);
+            console.warn(`[WARN] Snippet not found in originalText: "${originalSnippet}"`);
         }
         if (correctedIndex === -1 && correctedSnippet) {
-            console.warn(`Snippet not found in correctedText: "${correctedSnippet}"`);
+            console.warn(`[WARN] Snippet not found in correctedText: "${correctedSnippet}"`);
         }
 
         return {
@@ -130,7 +147,10 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
     writeDB(db);
 
     const shareUrl = `https://lektorview.chrustek.studio/view/${slug}`;
-    console.log(`Successfully created comparison. Slug: ${slug}`);
+    console.log(`[SUCCESS] Comparison created.`);
+    console.log(`[OUTPUT] Slug: ${slug}`);
+    console.log(`[OUTPUT] Share URL: ${shareUrl}`);
+    
     res.status(200).json({ slug, shareUrl });
 });
 
@@ -139,6 +159,7 @@ app.get('/api/public/comparisons/:slug', (req, res) => {
     const db = readDB();
     const comparison = db.comparisons ? db.comparisons[slug] : null;
     if (!comparison) {
+      console.warn(`[404] Comparison not found for slug: ${slug}`);
       return res.status(404).json({ error: 'Comparison not found.' });
     }
     res.json(comparison);
