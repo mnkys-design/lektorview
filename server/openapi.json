@@ -12,70 +12,24 @@
   ],
   "components": {
     "securitySchemes": {
-      "ApiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-api-key"
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT" 
       }
     }
   },
   "security": [
     {
-      "ApiKeyAuth": []
+      "bearerAuth": []
     }
   ],
   "paths": {
-    "/api/auth": {
-      "post": {
-        "operationId": "authenticateAgent",
-        "summary": "Authenticate to get an API Key",
-        "description": "Exchanges the Admin Secret for a valid API Key to perform uploads. This should be the first step.",
-        "security": [], 
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "adminSecret": {
-                    "type": "string",
-                    "description": "The system admin secret password."
-                  }
-                },
-                "required": ["adminSecret"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successfully authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "apiKey": {
-                      "type": "string",
-                      "description": "The API Key to be used in the 'x-api-key' header for subsequent requests."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid Admin Secret"
-          }
-        }
-      }
-    },
     "/api/comparisons": {
       "post": {
         "operationId": "uploadComparison",
         "summary": "Upload Text Comparison",
-        "description": "Uploads original and corrected text to generate a visual comparison link. Requires Authentication.",
+        "description": "Uploads original and corrected text to generate a visual comparison link.",
         "requestBody": {
           "required": true,
           "content": {

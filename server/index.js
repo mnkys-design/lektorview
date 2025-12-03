@@ -12,32 +12,31 @@ app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3001;
 const DB_PATH = path.join(__dirname, 'db.json');
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "lektor-admin-123";
+// NEW: Static Bearer Token for Agents (defaults to Admin Secret if not set)
+const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || ADMIN_SECRET; 
 
 // Ensure db.json exists
 if (!fs.existsSync(DB_PATH)) {
     fs.writeFileSync(DB_PATH, JSON.stringify({ comparisons: {}, apiKeys: [] }, null, 2), 'utf8');
 }
 
-// --- DEBUGGING MIDDLEWARE (First to log EVERYTHING including CORS preflights) ---
+// --- DEBUGGING MIDDLEWARE ---
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
 // Middleware
-// Explicit CORS configuration to allow LangDock and x-api-key
 app.use(cors({
-    origin: '*', // Allow any domain (LangDock, localhost, etc.)
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-Requested-With'],
-    credentials: false // Set to true if you need cookies, but requires specific origin instead of *
+    credentials: false
 }));
 
-// IMPORTANT: Use a raw body parser to log the incoming request for debugging
 app.use(express.json({ 
     limit: '50mb',
     verify: (req, res, buf) => {
-        // Save the raw buffer to the request object
         req.rawBody = buf;
     }
 }));
@@ -47,19 +46,39 @@ app.use(express.json({
 const readDB = () => JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
 const writeDB = (data) => fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
 
-// API Key Middleware
-const apiKeyMiddleware = (req, res, next) => {
-  // Check for key in headers (case-insensitive usually, but node headers are lowercase)
-  const apiKey = req.headers['x-api-key'];
+// --- UNIFIED AUTH MIDDLEWARE ---
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const legacyApiKey = req.headers['x-api-key'];
   
-  console.log(`[AUTH CHECK] Checking API Key: ${apiKey ? (apiKey.substring(0,4) + '***') : 'NONE'}`); // Log masked key
-  
-  const db = readDB();
-  if (!apiKey || !db.apiKeys.includes(apiKey)) {
-    console.warn(`[AUTH FAIL] Invalid or missing API Key. Received: ${apiKey}`);
-    return res.status(401).json({ error: 'Unauthorized: Invalid or missing API Key' });
+  // 1. Check Bearer Token (Preferred for Agents)
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      // Debug log (masked)
+      console.log(`[AUTH CHECK] Bearer Token: ${token ? (token.substring(0,4) + '***') : 'NONE'}`);
+      
+      if (token === API_BEARER_TOKEN) {
+          return next();
+      }
+      console.warn(`[AUTH FAIL] Invalid Bearer Token.`);
   }
-  next();
+  
+  // 2. Check Legacy API Key (For Frontend / db.json)
+  else if (legacyApiKey) {
+      console.log(`[AUTH CHECK] Legacy x-api-key: ${legacyApiKey.substring(0,4) + '***'}`);
+      const db = readDB();
+      if (db.apiKeys && db.apiKeys.includes(legacyApiKey)) {
+          return next();
+      }
+      console.warn(`[AUTH FAIL] Invalid x-api-key.`);
+  } 
+  
+  // 3. No valid auth found
+  else {
+      console.warn(`[AUTH FAIL] No Authorization header or x-api-key found.`);
+  }
+
+  return res.status(401).json({ error: 'Unauthorized: Invalid API Key or Bearer Token' });
 };
 
 // --- API Endpoints ---
@@ -69,28 +88,21 @@ app.get('/openapi.json', (req, res) => {
     res.sendFile(path.join(__dirname, 'openapi.json'));
 });
 
-// 2. Auth Endpoint for Agents to get their own key
+// 2. Legacy Auth Endpoint (Only for Frontend/Manual use now)
 app.post('/api/auth', (req, res) => {
     const { adminSecret } = req.body;
-    
-    // Check against the Environment Variable
     if (adminSecret !== ADMIN_SECRET) {
-        console.warn(`[AUTH FAIL] /api/auth called with invalid secret.`);
         return res.status(401).json({ error: "Invalid Admin Secret" });
     }
-
-    // Generate a new Session API Key
     const newApiKey = crypto.randomBytes(16).toString('hex');
     const db = readDB();
     if (!db.apiKeys) { db.apiKeys = []; }
     db.apiKeys.push(newApiKey);
     writeDB(db);
-
-    console.log(`[AUTH SUCCESS] New API Key generated: ${newApiKey}`);
+    console.log(`[AUTH SUCCESS] New Legacy API Key generated via /api/auth`);
     res.json({ apiKey: newApiKey });
 });
 
-// Legacy manual generation (kept for backward compatibility or manual use)
 app.post('/api/generate-key', (req, res) => {
     const { adminSecret } = req.body;
     if (adminSecret !== ADMIN_SECRET) {
@@ -104,12 +116,10 @@ app.post('/api/generate-key', (req, res) => {
     res.json({ apiKey: newApiKey });
 });
 
-app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
-    // Log the raw request body from GPT for debugging
+// 3. Main Comparison Endpoint (Protected by Unified Auth)
+app.post('/api/comparisons', authMiddleware, (req, res) => {
     if (req.rawBody) {
         console.log("[DEBUG] Raw Body Length:", req.rawBody.length);
-        // Uncomment next line to see full body in logs (can be huge)
-        // console.log("[DEBUG] Raw Body Content:", req.rawBody.toString('utf8').substring(0, 500) + "..."); 
     }
 
     const { originalText, correctedText, changeLog = [] } = req.body;
@@ -123,13 +133,6 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
         const { originalSnippet, correctedSnippet } = change;
         const originalIndex = originalSnippet ? originalText.indexOf(originalSnippet) : -1;
         const correctedIndex = correctedSnippet ? correctedText.indexOf(correctedSnippet) : -1;
-
-        if (originalIndex === -1 && originalSnippet) {
-            console.warn(`[WARN] Snippet not found in originalText: "${originalSnippet}"`);
-        }
-        if (correctedIndex === -1 && correctedSnippet) {
-            console.warn(`[WARN] Snippet not found in correctedText: "${correctedSnippet}"`);
-        }
 
         return {
             ...change,
@@ -154,8 +157,7 @@ app.post('/api/comparisons', apiKeyMiddleware, (req, res) => {
     writeDB(db);
 
     const shareUrl = `https://lektorview.chrustek.studio/view/${slug}`;
-    console.log(`[SUCCESS] Comparison created.`);
-    console.log(`[OUTPUT] Slug: ${slug}`);
+    console.log(`[SUCCESS] Comparison created. Slug: ${slug}`);
     console.log(`[OUTPUT] Share URL: ${shareUrl}`);
     
     res.status(200).json({ slug, shareUrl });
@@ -166,7 +168,6 @@ app.get('/api/public/comparisons/:slug', (req, res) => {
     const db = readDB();
     const comparison = db.comparisons ? db.comparisons[slug] : null;
     if (!comparison) {
-      console.warn(`[404] Comparison not found for slug: ${slug}`);
       return res.status(404).json({ error: 'Comparison not found.' });
     }
     res.json(comparison);
@@ -182,15 +183,13 @@ if (fs.existsSync(distPath)) {
 }
 
 // --- GLOBAL ERROR HANDLER ---
-// This is the last line of defense. If any route above throws an unhandled error,
-// this middleware will catch it and send a clean JSON error response.
 app.use((err, req, res, next) => {
     console.error('--- UNHANDLED ERROR ---');
     console.error(err);
     res.status(500).json({ error: 'An unexpected server error occurred.' });
 });
 
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
+  console.log(`API Bearer Token configured.`);
 });
