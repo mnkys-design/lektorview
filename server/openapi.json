@@ -10,12 +10,27 @@
       "url": "https://lektorview.chrustek.studio"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
   "paths": {
     "/api/auth": {
       "post": {
         "operationId": "authenticateAgent",
         "summary": "Authenticate to get an API Key",
-        "description": "Exchanges the Admin Secret for a valid API Key to perform uploads.",
+        "description": "Exchanges the Admin Secret for a valid API Key to perform uploads. This should be the first step.",
+        "security": [], 
         "requestBody": {
           "required": true,
           "content": {
@@ -60,18 +75,7 @@
       "post": {
         "operationId": "uploadComparison",
         "summary": "Upload Text Comparison",
-        "description": "Uploads original and corrected text to generate a visual comparison link.",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-api-key",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "description": "The API Key obtained from the /api/auth endpoint."
-          }
-        ],
+        "description": "Uploads original and corrected text to generate a visual comparison link. Requires Authentication.",
         "requestBody": {
           "required": true,
           "content": {
