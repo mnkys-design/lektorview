@@ -39,13 +39,39 @@ const apiKeyMiddleware = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   const db = readDB();
   if (!apiKey || !db.apiKeys.includes(apiKey)) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing API Key' });
   }
   next();
 };
 
 // --- API Endpoints ---
 
+// 1. Serve OpenAPI Spec for Agents
+app.get('/openapi.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'openapi.json'));
+});
+
+// 2. Auth Endpoint for Agents to get their own key
+app.post('/api/auth', (req, res) => {
+    const { adminSecret } = req.body;
+    
+    // Check against the Environment Variable
+    if (adminSecret !== ADMIN_SECRET) {
+        return res.status(401).json({ error: "Invalid Admin Secret" });
+    }
+
+    // Generate a new Session API Key
+    const newApiKey = crypto.randomBytes(16).toString('hex');
+    const db = readDB();
+    if (!db.apiKeys) { db.apiKeys = []; }
+    db.apiKeys.push(newApiKey);
+    writeDB(db);
+
+    console.log(`New API Key generated via Agent Auth: ${newApiKey}`);
+    res.json({ apiKey: newApiKey });
+});
+
+// Legacy manual generation (kept for backward compatibility or manual use)
 app.post('/api/generate-key', (req, res) => {
     const { adminSecret } = req.body;
     if (adminSecret !== ADMIN_SECRET) {

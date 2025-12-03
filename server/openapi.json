@@ -1,0 +1,125 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LektorView API",
+    "description": "API for uploading text comparisons and generating visualizations.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://lektorview.chrustek.studio"
+    }
+  ],
+  "paths": {
+    "/api/auth": {
+      "post": {
+        "operationId": "authenticateAgent",
+        "summary": "Authenticate to get an API Key",
+        "description": "Exchanges the Admin Secret for a valid API Key to perform uploads.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "adminSecret": {
+                    "type": "string",
+                    "description": "The system admin secret password."
+                  }
+                },
+                "required": ["adminSecret"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "string",
+                      "description": "The API Key to be used in the 'x-api-key' header for subsequent requests."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Admin Secret"
+          }
+        }
+      }
+    },
+    "/api/comparisons": {
+      "post": {
+        "operationId": "uploadComparison",
+        "summary": "Upload Text Comparison",
+        "description": "Uploads original and corrected text to generate a visual comparison link.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "The API Key obtained from the /api/auth endpoint."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "originalText": {
+                    "type": "string"
+                  },
+                  "correctedText": {
+                    "type": "string"
+                  },
+                  "changeLog": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": { "type": "string" },
+                        "originalSnippet": { "type": "string" },
+                        "correctedSnippet": { "type": "string" },
+                        "comment": { "type": "string" }
+                      }
+                    }
+                  }
+                },
+                "required": ["originalText", "correctedText"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comparison created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slug": { "type": "string" },
+                    "shareUrl": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
