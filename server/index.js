@@ -11,8 +11,7 @@ app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3001;
 const DB_PATH = path.join(__dirname, 'db.json');
-const ADMIN_SECRET = process.env.ADMIN_SECRET || "lektor-admin-123";
-// NEW: Static Bearer Token for Agents (defaults to Admin Secret if not set)
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || ADMIN_SECRET; 
 
 // Ensure db.json exists
